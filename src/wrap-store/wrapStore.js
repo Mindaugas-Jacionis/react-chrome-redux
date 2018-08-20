@@ -1,9 +1,10 @@
 import {
   DISPATCH_TYPE,
   STATE_TYPE,
-  PATCH_STATE_TYPE
+  PATCH_STATE_TYPE,
+  BROWSER,
 } from '../constants';
-import { withSerializer, withDeserializer, noop } from "../serialization";
+import { withSerializer, withDeserializer, noop } from '../serialization';
 
 import shallowDiff from '../strategies/shallowDiff/diff';
 
@@ -14,19 +15,18 @@ import shallowDiff from '../strategies/shallowDiff/diff';
  * @return {undefined}
  */
 const promiseResponder = (dispatchResult, send) => {
-  Promise
-    .resolve(dispatchResult)
-    .then((res) => {
+  Promise.resolve(dispatchResult)
+    .then(res => {
       send({
         error: null,
-        value: res
+        value: res,
       });
     })
-    .catch((err) => {
+    .catch(err => {
       console.error('error dispatching result:', err);
       send({
         error: err.message,
-        value: null
+        value: null,
       });
     });
 };
@@ -36,13 +36,16 @@ const promiseResponder = (dispatchResult, send) => {
  * @param {Object} store A Redux store
  * @param {Object} options An object of form {portName, dispatchResponder, serializer, deserializer}, where `portName` is a required string and defines the name of the port for state transition changes, `dispatchResponder` is a function that takes the result of a store dispatch and optionally implements custom logic for responding to the original dispatch message,`serializer` is a function to serialize outgoing message payloads (default is passthrough), `deserializer` is a function to deserialize incoming message payloads (default is passthrough), and diffStrategy is one of the included diffing strategies (default is shallow diff) or a custom diffing function.
  */
-export default (store, {
-  portName,
-  dispatchResponder,
-  serializer = noop,
-  deserializer = noop,
-  diffStrategy = shallowDiff
-}) => {
+export default (
+  store,
+  {
+    portName,
+    dispatchResponder,
+    serializer = noop,
+    deserializer = noop,
+    diffStrategy = shallowDiff,
+  }
+) => {
   if (!portName) {
     throw new Error('portName is required in options');
   }
@@ -53,7 +56,9 @@ export default (store, {
     throw new Error('deserializer must be a function');
   }
   if (typeof diffStrategy !== 'function') {
-    throw new Error('diffStrategy must be one of the included diffing strategies or a custom diff function');
+    throw new Error(
+      'diffStrategy must be one of the included diffing strategies or a custom diff function'
+    );
   }
 
   // set dispatch responder as promise responder
@@ -67,7 +72,7 @@ export default (store, {
   const dispatchResponse = (request, sender, sendResponse) => {
     if (request.type === DISPATCH_TYPE && request.portName === portName) {
       const action = Object.assign({}, request.payload, {
-        _sender: sender
+        _sender: sender,
       });
 
       let dispatchResult = null;
@@ -85,14 +90,16 @@ export default (store, {
   };
 
   /**
-  * Setup for state updates
-  */
-  const connectState = (port) => {
+   * Setup for state updates
+   */
+  const connectState = port => {
     if (port.name !== portName) {
       return;
     }
 
-    const serializedMessagePoster = withSerializer(serializer)((...args) => port.postMessage(...args));
+    const serializedMessagePoster = withSerializer(serializer)((...args) =>
+      port.postMessage(...args)
+    );
 
     let prevState = store.getState();
 
@@ -124,18 +131,23 @@ export default (store, {
   };
 
   const withPayloadDeserializer = withDeserializer(deserializer);
-  const shouldDeserialize = (request) => request.type === DISPATCH_TYPE && request.portName === portName;
+  const shouldDeserialize = request =>
+    request.type === DISPATCH_TYPE && request.portName === portName;
 
   /**
    * Setup action handler
    */
-  withPayloadDeserializer((...args) => chrome.runtime.onMessage.addListener(...args))(dispatchResponse, shouldDeserialize);
+  withPayloadDeserializer((...args) =>
+    BROWSER.runtime.onMessage.addListener(...args)
+  )(dispatchResponse, shouldDeserialize);
 
   /**
    * Setup external action handler
    */
-  if (chrome.runtime.onMessageExternal) {
-    withPayloadDeserializer((...args) => chrome.runtime.onMessageExternal.addListener(...args))(dispatchResponse, shouldDeserialize);
+  if (BROWSER.runtime.onMessageExternal) {
+    withPayloadDeserializer((...args) =>
+      BROWSER.runtime.onMessageExternal.addListener(...args)
+    )(dispatchResponse, shouldDeserialize);
   } else {
     console.warn('runtime.onMessageExternal is not supported');
   }
@@ -143,13 +155,13 @@ export default (store, {
   /**
    * Setup extended connection
    */
-  chrome.runtime.onConnect.addListener(connectState);
+  BROWSER.runtime.onConnect.addListener(connectState);
 
   /**
    * Setup extended external connection
    */
-  if (chrome.runtime.onConnectExternal) {
-    chrome.runtime.onConnectExternal.addListener(connectState);
+  if (BROWSER.runtime.onConnectExternal) {
+    BROWSER.runtime.onConnectExternal.addListener(connectState);
   } else {
     console.warn('runtime.onConnectExternal is not supported');
   }

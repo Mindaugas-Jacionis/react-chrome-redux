@@ -1,17 +1,15 @@
 import assignIn from 'lodash/assignIn';
 
 import { default as applyMiddlewareFn } from './applyMiddleware';
+import { BROWSER } from '../constants';
 
-import {
-  DISPATCH_TYPE,
-  STATE_TYPE,
-  PATCH_STATE_TYPE
-} from '../constants';
-import { withSerializer, withDeserializer, noop } from "../serialization";
+import { DISPATCH_TYPE, STATE_TYPE, PATCH_STATE_TYPE } from '../constants';
+import { withSerializer, withDeserializer, noop } from '../serialization';
 
 import shallowDiff from '../strategies/shallowDiff/patch';
 
-const backgroundErrPrefix = '\nLooks like there is an error in the background page. ' +
+const backgroundErrPrefix =
+  '\nLooks like there is an error in the background page. ' +
   'You might want to inspect your background page for more details.\n';
 
 export const applyMiddleware = applyMiddlewareFn;
@@ -21,7 +19,14 @@ class Store {
    * Creates a new Proxy store
    * @param  {object} options An object of form {portName, state, extensionId, serializer, deserializer, diffStrategy}, where `portName` is a required string and defines the name of the port for state transition changes, `state` is the initial state of this store (default `{}`) `extensionId` is the extension id as defined by chrome when extension is loaded (default `''`), `serializer` is a function to serialize outgoing message payloads (default is passthrough), `deserializer` is a function to deserialize incoming message payloads (default is passthrough), and patchStrategy is one of the included patching strategies (default is shallow diff) or a custom patching function.
    */
-  constructor({portName, state = {}, extensionId = null, serializer = noop, deserializer = noop, patchStrategy = shallowDiff}) {
+  constructor({
+    portName,
+    state = {},
+    extensionId = null,
+    serializer = noop,
+    deserializer = noop,
+    patchStrategy = shallowDiff,
+  }) {
     if (!portName) {
       throw new Error('portName is required in options');
     }
@@ -32,17 +37,27 @@ class Store {
       throw new Error('deserializer must be a function');
     }
     if (typeof patchStrategy !== 'function') {
-      throw new Error('patchStrategy must be one of the included patching strategies or a custom patching function');
+      throw new Error(
+        'patchStrategy must be one of the included patching strategies or a custom patching function'
+      );
     }
 
     this.portName = portName;
     this.readyResolved = false;
-    this.readyPromise = new Promise(resolve => this.readyResolve = resolve);
+    this.readyPromise = new Promise(resolve => (this.readyResolve = resolve));
 
     this.extensionId = extensionId; // keep the extensionId as an instance variable
-    this.port = chrome.runtime.connect(this.extensionId, {name: portName});
-    this.serializedPortListener = withDeserializer(deserializer)((...args) => this.port.onMessage.addListener(...args));
-    this.serializedMessageSender = withSerializer(serializer)((...args) => chrome.runtime.sendMessage(...args), 1);
+    this.port = BROWSER.runtime.connect(
+      this.extensionId,
+      { name: portName }
+    );
+    this.serializedPortListener = withDeserializer(deserializer)((...args) =>
+      this.port.onMessage.addListener(...args)
+    );
+    this.serializedMessageSender = withSerializer(serializer)(
+      (...args) => BROWSER.runtime.sendMessage(...args),
+      1
+    );
     this.listeners = [];
     this.state = state;
     this.patchStrategy = patchStrategy;
@@ -64,7 +79,7 @@ class Store {
           break;
 
         default:
-          // do nothing
+        // do nothing
       }
     });
 
@@ -72,10 +87,10 @@ class Store {
   }
 
   /**
-  * Returns a promise that resolves when the store is ready. Optionally a callback may be passed in instead.
-  * @param [function] callback An optional callback that may be passed in and will fire when the store is ready.
-  * @return {object} promise A promise that resolves when the store has established a connection with the background page.
-  */
+   * Returns a promise that resolves when the store is ready. Optionally a callback may be passed in instead.
+   * @param [function] callback An optional callback that may be passed in and will fire when the store is ready.
+   * @return {object} promise A promise that resolves when the store has established a connection with the background page.
+   */
   ready(cb = null) {
     if (cb !== null) {
       return this.readyPromise.then(cb);
@@ -93,7 +108,7 @@ class Store {
     this.listeners.push(listener);
 
     return () => {
-      this.listeners = this.listeners.filter((l) => l !== listener);
+      this.listeners = this.listeners.filter(l => l !== listener);
     };
   }
 
@@ -103,7 +118,7 @@ class Store {
    */
   patchState(difference) {
     this.state = this.patchStrategy(this.state, difference);
-    this.listeners.forEach((l) => l());
+    this.listeners.forEach(l => l());
   }
 
   /**
@@ -113,7 +128,7 @@ class Store {
   replaceState(state) {
     this.state = state;
 
-    this.listeners.forEach((l) => l());
+    this.listeners.forEach(l => l());
   }
 
   /**
@@ -143,9 +158,11 @@ class Store {
         {
           type: DISPATCH_TYPE,
           portName: this.portName,
-          payload: data
-        }, null, (resp) => {
-          const {error, value} = resp;
+          payload: data,
+        },
+        null,
+        resp => {
+          const { error, value } = resp;
 
           if (error) {
             const bgErr = new Error(`${backgroundErrPrefix}${error}`);
@@ -154,7 +171,8 @@ class Store {
           } else {
             resolve(value && value.payload);
           }
-        });
+        }
+      );
     });
   }
 }

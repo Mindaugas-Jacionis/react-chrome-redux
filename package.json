@@ -1,7 +1,8 @@
 {
-  "name": "react-chrome-redux",
+  "name": "redux-for-extensions",
   "version": "2.0.0-alpha.2",
-  "description": "A set of utilities for building Redux applications in Google Chrome Extensions.",
+  "description":
+    "A set of utilities for building Redux applications in Google Chrome Extensions.",
   "main": "lib/index.js",
   "typings": "./index.d.ts",
   "scripts": {
